@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %} Запись пользователя  {{ author.username }}  {% endblock %}
+{% block header %}Пост{% endblock %}
+{% block content %}
+{% load pluralize %}
+<main role="main" class="container">
+  <div class="row">
+    <div class="col-md-3 mb-3 mt-1">
+      <div class="card">
+        <div class="card-body">
+          <div class="h2">
+          <!-- Имя автора -->
+            {{ author.get_full_name }}
+          </div>
+          <div class="h3 text-muted">
+            <!-- username автора -->
+            <a href="{{ post.get_profile_url }}"><strong class="d-block text-gray-dark">{{ post.author.username }}</strong></a>
+          </div>
+        </div>
+        <ul class="list-group list-group-flush">
+          <li class="list-group-item">
+            <div class="h6 text-muted">
+              Подписчиков: XXX <br />
+              Подписан: XXX
+            </div>
+          </li>
+          <li class="list-group-item">
+            <div class="h6 text-muted text-center">
+              <!--Количество записей -->
+              {{ author.posts.count }} {{ author.posts.count|rupluralize:"Пост,Поста,Постов" }}
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="col-md-9">
+      <!-- Пост -->
+      {% include "post_item.html" with post=post %}
+      {% include "comment.html" %}
+    </div>
+  </div>
+</main>
+
+{% endblock %}
