@@ -300,19 +300,28 @@ class StaticViewTests(TestCase):
 
     def test_add_comment(self):
         self.authorized_client.post(reverse('new_post'), {
-            'text': 'Это текст'})
-        post = Post.objects.get(author=self.user)
-
+            'text': 'Это текст'},
+            follow=True,
+        )
+        post = Post.objects.last()
+        count = Comment.objects.count()
+        self.authorized_client_second.post(reverse(
+            'add_comment', kwargs={
+            'username': self.user,
+            'post_id': post.pk}), {
+            'text': 'коммент',
+            'post': post.pk},
+            follow=True,
+        )
+        count_comment = Comment.objects.count()
+        comment_last = Comment.objects.last()
         response = self.authorized_client.get(reverse(
-            'post', args=[
-            self.user_second,
-            post.pk])
+            'post', kwargs={
+            'username': self.user,
+            'post_id': post.pk})
         )
-        comment = self.authorized_client_second.post(reverse(
-            'add_comment', args=[
-            self.user_second,
-            post.pk,
-            'text'])
+        self.assertEqual(count_comment, count + 1)
+        self.assertEqual(response.context['comments'][0].text,
+            comment_last.text,
         )
-        self.assertContains(response, comment)
 

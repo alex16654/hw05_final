@@ -108,11 +108,11 @@ def add_comment(request, username, post_id):
     form = CommentForm(request.POST or None)
     comments = post.comment_post.all()
     if not form.is_valid():
-
-        return redirect(request, 'post', {
-            'form': form,
-            'post': post,
-            'comments': comments})
+        return redirect('post', username, post_id)
+        # return redirect('post', {
+        #     'form': form,
+        #     'post': post,
+        #     'comments': comments})
     comment = form.save(commit=False)
     comment.post = post
     comment.author = author
