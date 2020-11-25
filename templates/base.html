@@ -15,12 +15,15 @@
 <body>
     {% include 'nav.html' %}
     <main>
-        <div class="container">
-            <h1>{% block header %}{% endblock %}</h1>
+      <div class="w-100 p-3" style="background-color:#E0FFFF">
+        <div class="container" style="background-color:#E0FFFF">
+           <h1>{% block header %}{% endblock %}</h1>
             {% block content %}
             <!-- Содержимое страницы -->
             {% endblock %}
         </div>
+      </div>
+
     </main>
     {% include 'footer.html' %}
 </body>

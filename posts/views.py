@@ -1,14 +1,11 @@
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
 from django.views.decorators.cache import cache_page
 from django.shortcuts import render, get_object_or_404
 from django.shortcuts import redirect
 
-from .models import Post, Group, Comment, Follow
+from .models import Post, Group, User, Comment, Follow
 from .forms import PostForm, CommentForm
-
-User = get_user_model()
 
 
 @cache_page(1, key_prefix= 'index_page')
@@ -53,7 +50,8 @@ def profile(request, username):
     paginator = Paginator(post_list, 8)
     page_number = request.GET.get('page')
     page = paginator.get_page(page_number)
-    following = author.following.filter(user=request.user.id).exists()
+    follow = Follow.objects.filter(author=author)
+    following = follow.filter(user__id=request.user.id).exists()
     return render(request, 'profile.html', {
         'page': page,
         'author': author,
@@ -66,7 +64,7 @@ def post_view(request, username, post_id):
     author = get_object_or_404(User, username=username)
     post = get_object_or_404(Post, author__username=username, pk=post_id)
     form = CommentForm()
-    comments = post.comment_post.all()
+    comments = post.comments.all()
     return render(request, 'post.html', {
         'form': form,
         'author': author,
@@ -101,23 +99,19 @@ def page_not_found(request, exception):
 def server_error(request):
     return render(request, "misc/500.html", status=500)
 
+
 @login_required
 def add_comment(request, username, post_id):
-    post = get_object_or_404(Post, pk=post_id)
-    author = get_object_or_404(User, username=request.user)
+    post = get_object_or_404(Post, author__username=username, pk=post_id)
     form = CommentForm(request.POST or None)
-    comments = post.comment_post.all()
     if not form.is_valid():
         return redirect('post', username, post_id)
-        # return redirect('post', {
-        #     'form': form,
-        #     'post': post,
-        #     'comments': comments})
     comment = form.save(commit=False)
     comment.post = post
-    comment.author = author
+    comment.author = request.user
     comment.save()
     return redirect('post', username, post_id)
+
 
 @login_required
 def follow_index(request):
@@ -134,16 +128,18 @@ def follow_index(request):
 @login_required
 def profile_follow(request, username):
     author = get_object_or_404(User, username=username)
-    user = request.user
-    if author != user:
-        Follow.objects.get_or_create(user=user, author=author)
+    if author != request.user:
+        if Follow.objects.filter(user=request.user,
+                                 author=author).count() == 0:
+            Follow.objects.get_or_create(user=request.user, author=author)
     return redirect('profile', username=username)
 
 
 @login_required
 def profile_unfollow(request, username):
     author = get_object_or_404(User, username=username)
-    user = request.user
-    if author != user:
-        Follow.objects.get(user=user, author=author).delete()
+    if author != request.user:
+        if Follow.objects.filter(author=author,
+                                 user=request.user).exists():
+            Follow.objects.get(user=request.user, author=author).delete()
     return redirect('profile', username=username)

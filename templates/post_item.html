@@ -1,10 +1,11 @@
 {% load pluralize %}
 <div class="card mb-3 mt-1 shadow-sm">
+  {{ group_for_post_item }} {{ group.title }}
   {% load thumbnail %}
   {% thumbnail post.image "960x339" crop="center" upscale=True as im %}
     <img class="card-img" src="{{ im.url }}">
   {% endthumbnail %}
-  <div class="card-body">
+  <div class="card-body" style="background-color:#E6E6FA">
     <p class="card-text">
       <!-- Ссылка на страницу автора в атрибуте href; username автора в тексте ссылки -->
       <a name="post_{{ post.id }}" href="{{ post.get_profile_url }}">
@@ -19,9 +20,12 @@
     {% endif %}
     <div class="d-flex justify-content-between align-items-center">
       <div class="btn-group ">
-        {% if post.comment_post.exists %}
-          <a class="btn btn-sm text-muted" href="{{ post.get_absolute_url }}" role="button">{{ post.comment_post.count }}
-            {{ post.comment_post.count|rupluralize:"Комментарий,Комментария,Комментариев" }}
+        {% if post.comments.exists %}
+          <a class="btn btn-sm text-muted"
+             href="{{ post.get_absolute_url }}"
+             role="button"
+          >{{ post.comments.count }}
+           {{ post.comments.count|rupluralize:"Комментарий,Комментария,Комментариев" }}
           </a>
         {% endif %}
         <a class="btn btn-sm text-muted" href="{{ post.get_absolute_url }}" role="button">

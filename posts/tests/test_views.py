@@ -1,12 +1,10 @@
-from django.contrib.auth import get_user_model
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, Client
 from django.urls import reverse
 
 
-from posts.models import Post, Group, Comment, Follow
-
-User = get_user_model()
+from posts.models import Post, Group, Comment, Follow, User
 
 
 class StaticViewTests(TestCase):
@@ -20,7 +18,7 @@ class StaticViewTests(TestCase):
         cls.authorized_client.force_login(cls.user)
         cls.authorized_client_second.force_login(cls.user_second)
         cls.unauthorized_client = Client()
-        #cls.unauthorized_client_second = Client()
+
 
     def test_new_post(self):
         test_group = Group.objects.create(
@@ -63,7 +61,7 @@ class StaticViewTests(TestCase):
             'Профайл пользователя не создается после регистрации'
         )
 
-    def test_show_new_post_auth(self):
+    def test_show_new_post(self):
         cache.clear()
         test_group = Group.objects.create(
             title='tester',
@@ -77,62 +75,28 @@ class StaticViewTests(TestCase):
         )
         urls = (reverse('index'),
                 reverse('profile', args=[self.user.username]),
-                reverse('group_posts', args=[test_group.slug]))
+                reverse('group_posts', args=[test_group.slug]),
+                reverse('post', args=[self.user.username, post.id]),
+        )
         for url in urls:
             response_authorized = self.authorized_client.get(url)
+            cache.clear()
+            response_unauthorized = self.unauthorized_client.get(url)
+            if url != reverse('post', args=[self.user.username, post.id]):
+                post_auth = response_authorized.context['page'][0].text
+                post_unauth = response_unauthorized.context['page'][0].text
+            else:
+                post_auth = response_authorized.context['post'].text
+                post_unauth = response_unauthorized.context['post'].text
             with self.subTest(
                     'Пост не отображается на "' + url + '"' +
                     'для авторизованного пользователя'):
-                self.assertEqual(
-                    response_authorized.context['page'][0].text,
-                    post.text)
-
-    def test_show_new_post_unauth(self):
-        cache.clear()
-        test_group = Group.objects.create(
-            title='tester',
-            slug='test',
-            description='common'
-        )
-        post = Post.objects.create(
-            text='Это текст публикации',
-            author=self.user,
-            group=test_group
-        )
-        urls = (reverse('index'),
-                reverse('profile', args=[self.user.username]),
-                reverse('group_posts', args=[test_group.slug]))
-        for url in urls:
-            response_unauthorized = self.unauthorized_client.get(url)
+                self.assertEqual(post_auth, post.text)
             with self.subTest(
                     'Пост не отображается на "' + url + '"' +
                     'для неавторизованного пользователя'):
-                self.assertEqual(
-                    response_unauthorized.context['page'][0].text,
-                    post.text)
+                self.assertEqual(post_unauth, post.text)
 
-    def test_show_one_new_post(self):
-        test_group = Group.objects.create(
-            title='tester',
-            slug='test',
-            description='common'
-        )
-        post = Post.objects.create(
-            text='Это текст публикации',
-            author=self.user,
-            group=test_group
-        )
-        url = reverse('post', args=[self.user.username, post.id])
-        response_authorized = self.authorized_client.get(url)
-        response_unauthorized = self.unauthorized_client.get(url)
-        self.assertEqual(
-            response_authorized.context['post'].text,
-            post.text, 'Пост не отображается для '
-                       'авторизованного пользователя')
-        self.assertEqual(
-            response_unauthorized.context['post'].text,
-            post.text, 'Пост не отображается для '
-                       'неавторизованного пользователя')
 
     def test_edit_post(self):
         test_group_edit = Group.objects.create(
@@ -149,125 +113,97 @@ class StaticViewTests(TestCase):
         response = self.authorized_client.post(reverse(
             'post_edit', args=[self.user.username, post.id]), data,
             follow=True)
-        edit_post = Post.objects.last()
-        self.assertEqual(
-            edit_post.id,
-            post.id
-        )
-        self.assertEqual(
-            edit_post.text,
-            data['text']
-        )
-        self.assertEqual(
-            edit_post.group.id,
-            data['group']
-        )
+        post.refresh_from_db()
+        self.assertEqual(post.text, data['text'])
+        self.assertEqual(post.group.id, data['group'])
+
 
     def test_specific_page_image(self):
-        with open('media/posts/IMG_5233.jpg', 'rb') as img:
-            self.authorized_client.post(reverse('new_post'), {
-                'image': img,
-                'text': 'bla'}
-            )
-        post = Post.objects.last()
-        response = self.authorized_client.get(reverse('post', kwargs={
-            'username': self.user.username,
-            'post_id': post.pk}))
-        self.assertContains(response, '<img')
-
-    def test_page_image_index(self):
-        cache.clear()
-        with open('media/posts/IMG_5233.jpg', 'rb') as img:
-            self.authorized_client.post(reverse('new_post'), {
-                'image': img,
-                'text': 'bla'}
-            )
-        response = self.authorized_client.get(reverse('index'))
-        self.assertContains(response, '<img')
-
-    def test_page_image_profile(self):
-        with open('media/posts/IMG_5233.jpg', 'rb') as img:
-            self.authorized_client.post(reverse('new_post'), {
-                'image': img,
-                'text': 'bla'}
-            )
-        response = self.authorized_client.get(reverse('profile', kwargs={
-            'username': self.user.username}))
-        self.assertContains(response, '<img')
-
-    def test_page_image_group(self):
         test_group = Group.objects.create(
             title='tester',
             slug='test',
             description='common'
         )
-        with open('media/posts/IMG_5233.jpg', 'rb') as img:
-            self.authorized_client.post(reverse('new_post'), {
-                'image': img,
-                'text': 'bla',
-                'group': test_group.id}
-            )
-        post = Post.objects.last()
-        response = self.authorized_client.get(reverse('group_posts', kwargs={
-            'slug': post.group.slug})
+        small_gif = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
+                     b'\x01\x00\x80\x00\x00\x00\x00\x00'
+                     b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
+                     b'\x00\x00\x00\x2C\x00\x00\x00\x00'
+                     b'\x02\x00\x01\x00\x00\x02\x02\x0C'
+                     b'\x0A\x00\x3B'
         )
-        self.assertContains(response, '<img')
+        img = SimpleUploadedFile(
+            name='small.gif',
+            content=small_gif,
+            content_type='image/gif'
+        )
+        self.authorized_client.post(reverse('new_post'), {
+            'image': img,
+            'text': 'bla',
+            'group': test_group.id}
+        )
+        post = Post.objects.last()
+        urls = (reverse('index'),
+                reverse('profile', args=[self.user.username]),
+                reverse('group_posts', args=[test_group.slug]),
+                reverse('post', args=[self.user.username, post.id]),
+        )
+        for url in urls:
+            response = self.authorized_client.get(url)
+            self.assertContains(response, '<img')
+
 
     def test_page_image_check_text(self):
-        with open('media/posts/123.txt', 'rb') as img:
-            self.authorized_client.post(reverse('new_post'), {
+        small_gif = (b'abc')
+        img = SimpleUploadedFile(
+            name='small.gif',
+            content=small_gif,
+            content_type='image/gif'
+        )
+        response = self.authorized_client.post(reverse('new_post'), {
                 'image': img,
                 'text': 'bla'}
-            )
+        )
         count_post = Post.objects.all().count()
         self.assertEqual(count_post, 0)
-
-    def test_cashe(self):
-        test_group = Group.objects.create(
-            title='tester',
-            slug='test',
-            description='common'
+        error = ('Загрузите правильное изображение. '
+                 'Файл, который вы загрузили, '
+                 'поврежден или не является изображением.')
+        self.assertFormError(
+            response, 'form', 'image', error
         )
-        post = Post.objects.create(
+
+
+    def test_cache(self):
+        url = reverse('index')
+        response_authorized_index = self.authorized_client.get(url)
+        Post.objects.create(
             text='Это текст публикации',
             author=self.user,
-            group=test_group
         )
-        url_index = reverse('index')
-        response_authorized_index = self.authorized_client.get(url_index)
-        self.assertNotContains(
-            response_authorized_index,
-            post.text)
-        url_group = (reverse('group_posts', args=[test_group.slug]))
-        response_authorized_group = self.authorized_client.get(url_group)
-        self.assertContains(
-            response_authorized_group,
-            post.text)
+        self.assertEqual(
+            self.authorized_client.get(url).content,
+            response_authorized_index.content
+        )
         cache.clear()
-        post_after_clear = Post.objects.create(
-            text='Это текст публикации после очистки кэша',
-            author=self.user,
-            group=test_group,
+        self.assertNotEqual(
+            self.authorized_client.get(url).content,
+            response_authorized_index.content
         )
-        response_authorized_after_clear = self.authorized_client.get(url_index)
-        self.assertContains(
-            response_authorized_after_clear,
-            post_after_clear.text)
+
 
     def test_view_post_with_follow(self):
-        test_group = Group.objects.create(
-            title='tester',
-            slug='test',
-            description='common'
+        data = {'text': 'Это текст публикации второго пользователя'}
+        Follow.objects.create(
+            author=self.user_second,
+            user=self.user
         )
-        data = {'text': 'Это текст публикации второго пользователя',
-                'group': test_group.id}
-        self.authorized_client.get(reverse(
-            'profile_follow', kwargs={'username': self.user_second.username}))
-        self.authorized_client_second.post(
-            reverse('new_post'), data, follow=True)
+        Post.objects.create(
+            author=self.user_second,
+            text=data['text']
+        )
         response = self.authorized_client.get(reverse('follow_index'))
         self.assertContains(response, data['text'])
+
 
     def test_auth_follow(self):
         current_following_count = self.user.following.count()
@@ -275,19 +211,26 @@ class StaticViewTests(TestCase):
                 'profile_follow',
                 kwargs={'username': self.user_second},)
         )
+        follow_author_user = Follow.objects.filter(
+            author=self.user_second,
+            user=self.user
+        )
         self.assertRedirects(
             response_follow, reverse(
                 'profile', kwargs={
                 'username': self.user_second})
         )
-        self.assertEqual(Follow.objects.count(), current_following_count + 1)
+        self.assertEqual(
+            follow_author_user.count(),
+            current_following_count + 1
+        )
+
 
     def test_unfollow(self):
         current_following_count = self.user.following.count()
-        response_follow = self.authorized_client.get(reverse(
-            'profile_follow',
-            kwargs={'username': self.user_second})
-        )
+        follow_author_user = Follow.objects.filter(
+            author=self.user_second,
+            user=self.user)
         response_unfollow = self.authorized_client.get(reverse(
             'profile_unfollow', kwargs={
             'username': self.user_second})
@@ -296,14 +239,17 @@ class StaticViewTests(TestCase):
             'profile', kwargs={
             'username': self.user_second}),
         )
-        self.assertEqual(Follow.objects.count(), current_following_count)
-
-    def test_add_comment(self):
-        self.authorized_client.post(reverse('new_post'), {
-            'text': 'Это текст'},
-            follow=True,
+        self.assertEqual(
+            follow_author_user.count(),
+            current_following_count
         )
-        post = Post.objects.last()
+
+
+    def test_add_comment_auth(self):
+        post = Post.objects.create(
+            text='Это текст публикации',
+            author=self.user,
+        )
         count = Comment.objects.count()
         self.authorized_client_second.post(reverse(
             'add_comment', kwargs={
@@ -325,3 +271,19 @@ class StaticViewTests(TestCase):
             comment_last.text,
         )
 
+
+    def test_add_comment_unauth(self):
+        post = Post.objects.create(
+            text='Это текст публикации',
+            author=self.user,
+        )
+        self.unauthorized_client.post(reverse(
+            'add_comment', kwargs={
+            'username': self.user,
+            'post_id': post.pk}), {
+            'text': 'коммент',
+            'post': post.pk},
+            follow=True,
+        )
+        comment_count = Comment.objects.all().count()
+        self.assertEqual(comment_count, 0)

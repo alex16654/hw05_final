@@ -7,7 +7,7 @@
     <div class="row">
       <div class="col-md-3 mb-3 mt-1">
         <div class="card">
-          <div class="card-body">
+          <div class="card-body text-center" style="background-color:#E6E6FA">
             <div class="h2 text-center">
               <!-- Имя автора -->
               {{ author.get_full_name }}
@@ -17,30 +17,32 @@
               {{ author.username }}
             </div>
           </div>
-          <ul class="list-group list-group-flush">
-            <li class="list-group-item">
+          <ul class="list-group list-group-flush text-center">
+            <li class="list-group-item" style="background-color:#E6E6FA">
               <div class="h6 text-muted text-center">
-                Подписчиков: XXX <br />
-                Подписан: XXX
+                {{ author.following.count }} {{ author.following.count|rupluralize:"Подписчик,Подписчика,Подписчиков" }} <br />
+                {{ author.follower.count }} {{ author.follower.count|rupluralize:"Подписка,Подписки,Подписок" }}
               </div>
             </li>
-            <li class="list-group-item">
+            <li class="list-group-item" style="background-color:#E6E6FA">
               <div class="h6 text-muted text-center">
                 {{ author.posts.count }} {{ author.posts.count|rupluralize:"Пост,Поста,Постов" }}
               </div>
             </li>
-            <li class="list-group-item">
-              {% if following %}
-                <a class="btn btn-lg btn-light"
-                  href="{% url 'profile_unfollow' author.username %}" role="button">
-                   Отписаться
-                </a>
-              {% else %}
-                <a class="btn btn-lg btn-primary text-center"
-                  href="{% url 'profile_follow' author.username %}" role="button">
-                    Подписаться
-                </a>
-              {% endif %}
+            <li class="list-group-item" style="background-color:#E6E6FA">
+
+                {% if following %}
+                  <a class="btn btn-lg text-center"
+                    href="{% url 'profile_unfollow' author.username %}" role="button">
+                     Отписаться
+                  </a>
+                {% else %}
+                  <a class="btn btn-lg text-center"
+                    href="{% url 'profile_follow' author.username %}" role="button">
+                      Подписаться
+                  </a>
+                {% endif %}
+
             </li>
           </ul>
         </div>

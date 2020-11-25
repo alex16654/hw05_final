@@ -16,7 +16,7 @@ class Group(models.Model):
     description = models.TextField()
 
     def get_absolute_url(self):
-        return reverse('group_posts', kwargs={'slug': self.slug})
+        return reverse('group_posts', args=[self.slug])
 
     def __str__(self):
         return self.title
@@ -50,19 +50,13 @@ class Post(models.Model):
         ordering = ('-pub_date',)
 
     def get_absolute_url(self):
-        return reverse('post', kwargs={
-            'username': self.author,
-            'post_id': self.pk}
-        )
+        return reverse('post', args=[self.author, self.pk])
 
     def get_edit_url(self):
-        return reverse('post_edit', kwargs={
-            'username': self.author,
-            'post_id': self.pk}
-        )
+        return reverse('post_edit', args=[self.author, self.pk])
 
     def get_profile_url(self):
-        return reverse('profile', kwargs={'username': self.author})
+        return reverse('profile', args=[self.author])
 
     def __str__(self):
         return(f' user: {self.author},'
@@ -75,21 +69,15 @@ class Comment(models.Model):
     post = models.ForeignKey(
         Post,
         on_delete=models.CASCADE,
-        related_name='comment_post'
+        related_name='comments'
     )
     author = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
-        related_name='comment_author'
+        related_name='comments'
     )
     text = models.TextField(max_length=280)
     created = models.DateTimeField(auto_now_add=True)
-
-    # def get_absolut_url(self):
-    #     return reverse('add_comment', kwargs={
-    #         'username': self.author,
-    #         'post_id': self.post}
-    #     )
 
     class Meta:
         ordering = ('-created',)
@@ -109,8 +97,7 @@ class Follow(models.Model):
         related_name='following',
     )
     class Meta:
-        models.UniqueConstraint(fields=[
-            'user',
-            'author'], name=
-            'following_unique'
+        models.UniqueConstraint(
+            fields=['user','author'],
+            name=['following_unique']
         )
