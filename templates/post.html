@@ -20,14 +20,14 @@
         <ul class="list-group list-group-flush">
           <li class="list-group-item">
             <div class="h6 text-muted text-center">
-              {{ author.following.count }} {{ author.following.count|rupluralize:"Подписчик,Подписчика,Подписчиков" }} <br />
-              {{ author.follower.count }} {{ author.follower.count|rupluralize:"Подписка,Подписки,Подписок" }}
+              Подписчиков: {{ author.following.count }}<br />
+              Подписан: {{ author.follower.count }}
             </div>
           </li>
           <li class="list-group-item">
             <div class="h6 text-muted text-center">
               <!--Количество записей -->
-              {{ author.posts.count }} {{ author.posts.count|rupluralize:"Пост,Поста,Постов" }}
+              Записей: {{ author.posts.count }}
             </div>
           </li>
         </ul>
