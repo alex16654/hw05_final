@@ -109,6 +109,7 @@ class StaticViewTests(TestCase):
             text='Это текст публикации',
             author=self.user,
         )
+        self.assertFalse(post.image)
         small_gif = (b'\x47\x49\x46\x38\x39\x61\x02\x00'
                      b'\x01\x00\x80\x00\x00\x00\x00\x00'
                      b'\xFF\xFF\xFF\x21\xF9\x04\x00\x00'
@@ -130,7 +131,7 @@ class StaticViewTests(TestCase):
         post.refresh_from_db()
         self.assertEqual(post.text, data['text'])
         self.assertEqual(post.group.id, data['group'])
-        self.assertContains(response, '<img')
+        self.assertTrue(post.image)
 
     def test_specific_page_image(self):
         test_group = Group.objects.create(
@@ -163,7 +164,9 @@ class StaticViewTests(TestCase):
         )
         for url in urls:
             response = self.authorized_client.get(url)
-            self.assertContains(response, '<img')
+            with self.subTest(
+                    'Картинка не отображается на "' + url + '"'):
+                self.assertContains(response, '<img')
 
     def test_new_post_with_image(self):
         count = Post.objects.all().count()
@@ -191,7 +194,7 @@ class StaticViewTests(TestCase):
         post_count = Post.objects.all().count()
         post_img = Post.objects.last()
         self.assertEqual(post_count, count+1)
-        self.assertEqual(post_img.text, data['text'])
+        self.assertTrue(post_img.image)
 
     def test_page_image_check_text(self):
         small_gif = (b'abc')
@@ -250,51 +253,38 @@ class StaticViewTests(TestCase):
         response_second = self.authorized_client_second.get(reverse(
             'follow_index')
         )
-        self.assertEqual(response.context['page'][0], post)
         self.assertIn(post, response.context['page'])
         self.assertNotIn(post_second, response_second.context['page'])
 
     def test_auth_follow(self):
-        current_following_count = Follow.objects.filter(
-            author=self.user_second,
-            user=self.user).count()
         response_follow = self.authorized_client.get(reverse(
                 'profile_follow',
                 kwargs={'username': self.user_second},)
         )
         follow_author_user_count = Follow.objects.filter(
             author=self.user_second,
-            user=self.user).count()
+            user=self.user).exists()
         self.assertRedirects(
             response_follow, reverse(
                 'profile', kwargs={
                 'username': self.user_second})
         )
-        self.assertEqual(
-            follow_author_user_count,
-            current_following_count + 1
-        )
+        self.assertTrue(follow_author_user_count)
 
     def test_unfollow(self):
         Follow.objects.create(
             author=self.user_second,
             user=self.user)
-        current_following_count = Follow.objects.filter(
-            author=self.user_second,
-            user=self.user).count()
         response_unfollow = self.authorized_client.get(reverse(
             'profile_unfollow', args=[self.user_second])
         )
         current_following_count_unfollow = Follow.objects.filter(
             author=self.user_second,
-            user=self.user).count()
+            user=self.user).exists()
         self.assertRedirects(response_unfollow, reverse('profile',
             args=[self.user_second]),
         )
-        self.assertEqual(
-            current_following_count_unfollow,
-            current_following_count - 1
-        )
+        self.assertFalse(current_following_count_unfollow)
 
     def test_add_comment_auth(self):
         post = Post.objects.create(
@@ -307,7 +297,11 @@ class StaticViewTests(TestCase):
             self.user.username, post.pk]), data, follow=True,
         )
         count_comment = Comment.objects.count()
+        comment = Comment.objects.last()
         self.assertEqual(count_comment, count + 1)
+        self.assertEqual(comment.text, data['text'])
+        self.assertEqual(comment.post.id, post.pk)
+        self.assertEqual(comment.author.username, self.user_second.username)
 
     def test_add_comment_unauth(self):
         post = Post.objects.create(
